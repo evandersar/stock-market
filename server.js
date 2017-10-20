@@ -57,7 +57,7 @@ io.on('connection', function(socket) {
                 }
                 else {
                     SYMBOLS.pop();
-                    io.emit('search_err');
+                    io.to(socket.id).emit('search_err');
                 }
 
             });
