@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Stock market</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+    <script src="https://code.highcharts.com/stock/highstock.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/6.0.1/js/themes/dark-unica.js"></script>
+    <style>
+        body {
+            background-color: #555;
+            font: 13px Helvetica, Arial;
+            margin-top: 20px;
+        }
+
+        #chartdiv {
+            width: 100%;
+            height: 500px;
+        }
+
+        .alert {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="chartdiv"></div>
+        </br>
+        <form action="">
+            <div class="row">
+                <div class="col-md-6">
+                    <input id="m" class="form-control" autocomplete="off" placeholder="Stock code" />
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-primary btn-block"><strong>Add stock</strong></button>
+                </div>
+            </div>
+        </form>
+        </br>
+        <div id="cont" class="row"></div>
+        <div id="err_cont" class="row"></div>
+    </div>
+
+    <script>
+        $(function() {
+            var socket = io();
+
+            var seriesOptions = [];
+
+            createChart();
+            socket.emit('search', '');
+
+            $('form').submit(function() {
+                if ($('#m').val()) socket.emit('search', $('#m').val());
+                $('#m').val('');
+                return false;
+            });
+
+
+            $('#cont').on('click', '.close', function(e) {
+                //console.log('e.currentTarget.id => ', e.currentTarget.id);
+                socket.emit('remove', e.currentTarget.id);
+            });
+
+            socket.on('data', function(data) {
+                var parsedData = JSON.parse(data);
+                //console.log('parsedData => ', parsedData);
+
+                //dont refresh page if other user is connected
+                if (parsedData.length !== seriesOptions.length) {
+                    seriesOptions = parsedData;
+                    createChart();
+                    createLabels(parsedData);
+                }
+            });
+
+            socket.on('search_err', function() {
+                showErr();
+            });
+
+            function createLabels(stocks) {
+                $('#cont').html('');
+                for (var stock of stocks) {
+                    $('#cont').append(
+                        `
+                        <div class="col-md-3">
+                            <div class="alert alert-info alert-dismissible" role="alert">
+                                <button id="${stock.name}" type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                <strong>${stock.name}</strong>
+                            </div>
+                        </div>
+                        `
+                    );
+                }
+            }
+
+            function showErr() {
+                $('#err_cont').html(
+                    '<div class="col-md-12"><div class="alert alert-danger text-center" role="alert"><strong>Incorrect or not existing stock code</strong></div></div>'
+                );
+                setTimeout(() => {
+                    $('#err_cont').html('');
+                }, 3000);
+            }
+
+            function createChart() {
+
+                Highcharts.stockChart('chartdiv', {
+
+                    rangeSelector: {
+                        selected: 2
+                    },
+
+                    yAxis: {
+                        labels: {
+                            formatter: function() {
+                                return (this.value > 0 ? ' + ' : '') + this.value + '%';
+                            }
+                        },
+                        plotLines: [{
+                            value: 0,
+                            width: 2,
+                            color: 'silver'
+                        }]
+                    },
+
+                    plotOptions: {
+                        series: {
+                            compare: 'percent',
+                            showInNavigator: true
+                        }
+                    },
+
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.change}%)<br/>',
+                        valueDecimals: 2,
+                        split: true
+                    },
+
+                    series: seriesOptions
+                });
+            }
+
+        });
+    </script>
+</body>
+
+</html>
